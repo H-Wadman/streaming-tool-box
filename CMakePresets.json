@@ -1,0 +1,120 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 31,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "unix-debug",
+      "displayName": "Unix Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "STREAMINGTOOLBOX_BUILD_EXAMPLES": "ON",
+        "STREAMINGTOOLBOX_ALLOW_GTEST_DOWNLOAD": "ON"
+      }
+    },
+    {
+      "name": "unix-release",
+      "displayName": "Unix Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "STREAMINGTOOLBOX_BUILD_EXAMPLES": "ON",
+        "STREAMINGTOOLBOX_ALLOW_GTEST_DOWNLOAD": "ON"
+      }
+    },
+    {
+      "name": "unix-debug-clang-tidy",
+      "displayName": "Unix Debug with clang-tidy",
+      "inherits": "unix-debug",
+      "cacheVariables": {
+        "STREAMINGTOOLBOX_ENABLE_CLANG_TIDY": "ON"
+      }
+    },
+    {
+      "name": "unix-debug-asan-ubsan",
+      "displayName": "Unix Debug with ASan and UBSan",
+      "inherits": "unix-debug",
+      "cacheVariables": {
+        "STREAMINGTOOLBOX_ENABLE_ASAN": "ON",
+        "STREAMINGTOOLBOX_ENABLE_UBSAN": "ON"
+      }
+    },
+    {
+      "name": "unix-debug-tsan",
+      "displayName": "Unix Debug with ThreadSanitizer",
+      "inherits": "unix-debug",
+      "cacheVariables": {
+        "STREAMINGTOOLBOX_ENABLE_TSAN": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "unix-debug",
+      "configurePreset": "unix-debug"
+    },
+    {
+      "name": "unix-release",
+      "configurePreset": "unix-release"
+    },
+    {
+      "name": "unix-debug-clang-tidy",
+      "configurePreset": "unix-debug-clang-tidy"
+    },
+    {
+      "name": "unix-debug-asan-ubsan",
+      "configurePreset": "unix-debug-asan-ubsan"
+    },
+    {
+      "name": "unix-debug-tsan",
+      "configurePreset": "unix-debug-tsan"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "unix-debug",
+      "configurePreset": "unix-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "unix-release",
+      "configurePreset": "unix-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "unix-debug-clang-tidy",
+      "configurePreset": "unix-debug-clang-tidy",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "unix-debug-asan-ubsan",
+      "configurePreset": "unix-debug-asan-ubsan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "unix-debug-tsan",
+      "configurePreset": "unix-debug-tsan",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

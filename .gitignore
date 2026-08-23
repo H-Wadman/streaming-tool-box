@@ -1,0 +1,13 @@
+/build/
+/install/
+.cache/
+.clangd/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+*.ninja
+.*.swp
