@@ -20,7 +20,25 @@ cmake --build --preset unix-debug
 ctest --preset unix-debug
 ```
 
-The release workflow uses the corresponding `unix-release` presets.
+Release builds use the corresponding `unix-release` preset.
+
+## Formatting
+
+Install `pre-commit` and both repository hooks:
+
+```sh
+python3 -m pip install pre-commit
+pre-commit install --install-hooks
+```
+
+The hooks run the pinned clang-format version before commits and pushes. To
+check every tracked C and C++ file explicitly:
+
+```sh
+pre-commit run --all-files --show-diff-on-failure
+```
+
+The same full-repository check runs in CI.
 
 ## clang-tidy
 
@@ -62,6 +80,22 @@ STREAMINGTOOLBOX_ENABLE_LSAN
 ```
 
 MemorySanitizer requires the upstream Clang compiler on Linux and instrumented dependencies. Standalone LeakSanitizer is supported on Linux. ThreadSanitizer, MemorySanitizer, and LeakSanitizer cannot be combined with AddressSanitizer; incompatible combinations are rejected during configuration. Sanitizer runtimes also depend on host kernel and runtime support.
+
+## Continuous integration
+
+GitHub Actions runs for pull requests targeting `main`, pushes to `main`, and
+manual or merge-queue requests. The required checks include:
+
+- Ubuntu 24.04 builds and tests with distribution-default GCC and Clang
+- Explicit GCC 16 and LLVM Clang 22 builds and tests
+- clang-tidy with warnings treated as errors
+- AddressSanitizer/UndefinedBehaviorSanitizer and ThreadSanitizer tests
+- Static and shared installed-package consumer checks
+
+Protect `main` in the repository settings and require the `CI gate` status
+check. Also require pull requests and an up-to-date branch before merging. A
+workflow can report a failed push after it happens, but branch protection is
+what prevents an unvalidated direct push or merge.
 
 ## Install and consume
 

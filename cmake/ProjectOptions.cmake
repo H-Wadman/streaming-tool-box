@@ -81,11 +81,15 @@ function(streaming_toolbox_apply_project_options target)
   endif()
 
   if(STREAMINGTOOLBOX_ENABLE_CLANG_TIDY)
+    set(_streamingtoolbox_clang_tidy_arguments --allow-no-checks)
+    if(STREAMINGTOOLBOX_WARNINGS_AS_ERRORS)
+      list(APPEND _streamingtoolbox_clang_tidy_arguments --warnings-as-errors=*)
+    endif()
     set_property(
       TARGET "${target}"
       PROPERTY
         CXX_CLANG_TIDY
-        "${STREAMINGTOOLBOX_CLANG_TIDY_EXECUTABLE};--allow-no-checks"
+        "${STREAMINGTOOLBOX_CLANG_TIDY_EXECUTABLE};${_streamingtoolbox_clang_tidy_arguments}"
     )
   endif()
 

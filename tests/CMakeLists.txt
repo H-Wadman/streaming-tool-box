@@ -17,4 +17,5 @@ streaming_toolbox_apply_project_options(StreamingToolBoxTests)
 gtest_discover_tests(
   StreamingToolBoxTests
   DISCOVERY_MODE PRE_TEST
+    DISCOVERY_TIMEOUT 30
 )

@@ -1,0 +1,475 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  merge_group:
+    types:
+      - checks_requested
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install formatting tooling
+        run: python -m pip install --disable-pip-version-check "pre-commit==3.7.1"
+
+      - name: Check formatting
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  build:
+    name: Build and test (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu default GCC
+            cc: gcc
+            cxx: g++
+            packages: gcc g++
+            add-gcc-repository: false
+            add-llvm-repository: false
+          - name: Ubuntu default Clang
+            cc: clang
+            cxx: clang++
+            packages: clang
+            add-gcc-repository: false
+            add-llvm-repository: false
+          - name: GCC 16
+            cc: gcc-16
+            cxx: g++-16
+            packages: gcc-16 g++-16
+            add-gcc-repository: true
+            add-llvm-repository: false
+          - name: LLVM Clang 22
+            cc: clang-22
+            cxx: clang++-22
+            packages: clang-22
+            add-gcc-repository: false
+            add-llvm-repository: true
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up GCC repository
+        if: matrix.add-gcc-repository
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository --yes ppa:ubuntu-toolchain-r/test
+
+      - name: Set up LLVM repository
+        if: matrix.add-llvm-repository
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl gnupg
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl --fail --silent --show-error --location \
+            https://apt.llvm.org/llvm-snapshot.gpg.key |
+            gpg --dearmor |
+            sudo tee /etc/apt/keyrings/llvm.gpg > /dev/null
+          echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main" |
+            sudo tee /etc/apt/sources.list.d/llvm.list > /dev/null
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            pkg-config \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libswresample-dev \
+            libgtest-dev \
+            ${{ matrix.packages }}
+
+      - name: Set up Python and CMake
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install supported CMake
+        run: |
+          python -m pip install --disable-pip-version-check "cmake>=3.31,<4"
+          cmake --version
+
+      - name: Show toolchain
+        run: |
+          echo "CC=${CC}"
+          echo "CXX=${CXX}"
+          command -v "${CC}"
+          command -v "${CXX}"
+          "${CC}" --version
+          "${CXX}" --version
+
+      - name: Configure
+        run: >-
+          cmake --preset unix-debug
+          -DSTREAMINGTOOLBOX_ALLOW_GTEST_DOWNLOAD=OFF
+          -DSTREAMINGTOOLBOX_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build --preset unix-debug --parallel
+
+      - name: Test
+        run: ctest --preset unix-debug
+
+      - name: Upload diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: diagnostics-build-${{ matrix.name }}
+          if-no-files-found: ignore
+          path: |
+            build/**/CMakeFiles/CMakeError.log
+            build/**/CMakeFiles/CMakeOutput.log
+            build/**/Testing/Temporary/LastTest.log
+            build/**/compile_commands.json
+
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CC: clang-22
+      CXX: clang++-22
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up LLVM repository
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl gnupg
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl --fail --silent --show-error --location \
+            https://apt.llvm.org/llvm-snapshot.gpg.key |
+            gpg --dearmor |
+            sudo tee /etc/apt/keyrings/llvm.gpg > /dev/null
+          echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main" |
+            sudo tee /etc/apt/sources.list.d/llvm.list > /dev/null
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            pkg-config \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libswresample-dev \
+            libgtest-dev \
+            clang-22 \
+            clang-tidy-22
+
+      - name: Set up Python and CMake
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install supported CMake
+        run: |
+          python -m pip install --disable-pip-version-check "cmake>=3.31,<4"
+          cmake --version
+
+      - name: Show toolchain
+        run: |
+          command -v "${CC}"
+          command -v "${CXX}"
+          command -v clang-tidy-22
+          "${CC}" --version
+          clang-tidy-22 --version
+
+      - name: Configure with clang-tidy
+        run: |
+          cmake --preset unix-debug-clang-tidy \
+            -DSTREAMINGTOOLBOX_ALLOW_GTEST_DOWNLOAD=OFF \
+            -DSTREAMINGTOOLBOX_WARNINGS_AS_ERRORS=ON \
+            -DSTREAMINGTOOLBOX_CLANG_TIDY_EXECUTABLE="$(command -v clang-tidy-22)"
+
+      - name: Build with clang-tidy
+        run: cmake --build --preset unix-debug-clang-tidy --parallel
+
+      - name: Test
+        run: ctest --preset unix-debug-clang-tidy
+
+      - name: Upload diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: diagnostics-clang-tidy
+          if-no-files-found: ignore
+          path: |
+            build/**/CMakeFiles/CMakeError.log
+            build/**/CMakeFiles/CMakeOutput.log
+            build/**/Testing/Temporary/LastTest.log
+            build/**/compile_commands.json
+
+  asan-ubsan:
+    name: ASan and UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CC: clang
+      CXX: clang++
+      ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1:print_stacktrace=1
+      UBSAN_OPTIONS: abort_on_error=1:halt_on_error=1:print_stacktrace=1
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            pkg-config \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libswresample-dev \
+            libgtest-dev \
+            clang
+
+      - name: Set up Python and CMake
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install supported CMake
+        run: |
+          python -m pip install --disable-pip-version-check "cmake>=3.31,<4"
+          cmake --version
+
+      - name: Configure with ASan and UBSan
+        run: >-
+          cmake --preset unix-debug-asan-ubsan
+          -DSTREAMINGTOOLBOX_ALLOW_GTEST_DOWNLOAD=OFF
+          -DSTREAMINGTOOLBOX_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build --preset unix-debug-asan-ubsan --parallel
+
+      - name: Test
+        run: ctest --preset unix-debug-asan-ubsan
+
+      - name: Upload diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: diagnostics-asan-ubsan
+          if-no-files-found: ignore
+          path: |
+            build/**/CMakeFiles/CMakeError.log
+            build/**/CMakeFiles/CMakeOutput.log
+            build/**/Testing/Temporary/LastTest.log
+            build/**/compile_commands.json
+
+  tsan:
+    name: ThreadSanitizer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CC: clang
+      CXX: clang++
+      TSAN_OPTIONS: abort_on_error=1:halt_on_error=1:history_size=7:print_stacktrace=1
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            pkg-config \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libswresample-dev \
+            libgtest-dev \
+            clang
+
+      - name: Set up Python and CMake
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install supported CMake
+        run: |
+          python -m pip install --disable-pip-version-check "cmake>=3.31,<4"
+          cmake --version
+
+      - name: Configure with TSan
+        run: >-
+          cmake --preset unix-debug-tsan
+          -DSTREAMINGTOOLBOX_ALLOW_GTEST_DOWNLOAD=OFF
+          -DSTREAMINGTOOLBOX_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build --preset unix-debug-tsan --parallel
+
+      - name: Test
+        run: ctest --preset unix-debug-tsan
+
+      - name: Upload diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: diagnostics-tsan
+          if-no-files-found: ignore
+          path: |
+            build/**/CMakeFiles/CMakeError.log
+            build/**/CMakeFiles/CMakeOutput.log
+            build/**/Testing/Temporary/LastTest.log
+            build/**/compile_commands.json
+
+  install-consumer:
+    name: Install and consume (${{ matrix.linkage }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - linkage: static
+            shared: OFF
+          - linkage: shared
+            shared: ON
+    env:
+      CC: gcc
+      CXX: g++
+      BUILD_DIR: build/install-${{ matrix.linkage }}
+      INSTALL_PREFIX: ${{ github.workspace }}/build/prefix-${{ matrix.linkage }}
+      CONSUMER_BUILD_DIR: build/consumer-${{ matrix.linkage }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            pkg-config \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libswresample-dev
+
+      - name: Set up Python and CMake
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install supported CMake
+        run: |
+          python -m pip install --disable-pip-version-check "cmake>=3.31,<4"
+          cmake --version
+
+      - name: Configure library
+        run: |
+          cmake -S . -B "${BUILD_DIR}" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+            -DBUILD_TESTING=OFF \
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }} \
+            -DSTREAMINGTOOLBOX_BUILD_EXAMPLES=OFF \
+            -DSTREAMINGTOOLBOX_WARNINGS_AS_ERRORS=ON
+
+      - name: Build library
+        run: cmake --build "${BUILD_DIR}" --parallel
+
+      - name: Install library
+        run: cmake --install "${BUILD_DIR}"
+
+      - name: Configure installed consumer
+        run: |
+          cmake -S tests/install-consumer -B "${CONSUMER_BUILD_DIR}" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${INSTALL_PREFIX}"
+
+      - name: Build installed consumer
+        run: cmake --build "${CONSUMER_BUILD_DIR}" --parallel
+
+      - name: Test installed consumer
+        run: ctest --test-dir "${CONSUMER_BUILD_DIR}" --output-on-failure
+
+      - name: Upload diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: diagnostics-install-consumer-${{ matrix.linkage }}
+          if-no-files-found: ignore
+          path: |
+            build/**/CMakeFiles/CMakeError.log
+            build/**/CMakeFiles/CMakeOutput.log
+            build/**/Testing/Temporary/LastTest.log
+            build/**/compile_commands.json
+
+  ci-gate:
+    name: CI gate
+    if: ${{ always() }}
+    needs:
+      - format
+      - build
+      - clang-tidy
+      - asan-ubsan
+      - tsan
+      - install-consumer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require all checks to pass
+        if: >-
+          ${{ needs.format.result != 'success' ||
+          needs.build.result != 'success' ||
+          needs.clang-tidy.result != 'success' ||
+          needs.asan-ubsan.result != 'success' ||
+          needs.tsan.result != 'success' ||
+          needs.install-consumer.result != 'success' }}
+        run: |
+          echo "format: ${{ needs.format.result }}"
+          echo "build: ${{ needs.build.result }}"
+          echo "clang-tidy: ${{ needs.clang-tidy.result }}"
+          echo "asan-ubsan: ${{ needs.asan-ubsan.result }}"
+          echo "tsan: ${{ needs.tsan.result }}"
+          echo "install-consumer: ${{ needs.install-consumer.result }}"
+          exit 1
+
+      - name: Report success
+        run: echo "All required CI checks passed."
