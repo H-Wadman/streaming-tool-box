@@ -7,6 +7,10 @@ project(
   LANGUAGES CXX
 )
 
+if(NOT DEFINED CMAKE_CXX_EXTENSIONS)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
+
 if(NOT UNIX)
   message(FATAL_ERROR "StreamingToolBox currently supports Unix-like platforms only.")
 endif()
