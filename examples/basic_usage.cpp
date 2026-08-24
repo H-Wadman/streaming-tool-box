@@ -2,8 +2,8 @@
 
 #include <iostream>
 
-int main()
+auto main() -> int
 {
-    std::cout << streaming_toolbox::ffmpeg_avformat_version() << '\n';
+    std::cout << hw::stb::ffmpeg_avformat_version() << '\n';
     return 0;
 }

@@ -2,8 +2,8 @@
 
 #include <cstdlib>
 
-int main()
+auto main() -> int
 {
-    const auto version = streaming_toolbox::ffmpeg_avformat_version();
+    const auto version = hw::stb::ffmpeg_avformat_version();
     return version > 0U ? EXIT_SUCCESS : EXIT_FAILURE;
 }
