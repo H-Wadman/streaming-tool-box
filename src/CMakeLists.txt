@@ -1,6 +1,7 @@
 add_library(
   StreamingToolBox
   StreamingToolBox.cpp
+  avformat_utils.cpp
 )
 
 add_library(StreamingToolBox::StreamingToolBox ALIAS StreamingToolBox)
@@ -14,6 +15,8 @@ generate_export_header(
 
 target_sources(
   StreamingToolBox
+  PRIVATE
+    avformat_utils.hpp
   PUBLIC
     FILE_SET public_headers
     TYPE HEADERS
