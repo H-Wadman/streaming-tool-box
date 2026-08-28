@@ -69,6 +69,21 @@ cmake --build --preset unix-debug-tsan
 ctest --preset unix-debug-tsan
 ```
 
+On hosts where LeakSanitizer cannot run because of ptrace or sandbox
+restrictions, configure the tests to keep AddressSanitizer and UBSan enabled
+while disabling only leak detection:
+
+```sh
+cmake --preset unix-debug-asan-ubsan \
+	-DSTREAMINGTOOLBOX_DISABLE_LSAN_FOR_TESTS=ON
+cmake --build --preset unix-debug-asan-ubsan
+ctest --preset unix-debug-asan-ubsan
+```
+
+This option is disabled by default because it removes LeakSanitizer coverage
+from both test discovery and test execution. Use it only for environments
+where LeakSanitizer cannot start.
+
 For other combinations, use these cache options:
 
 ```text

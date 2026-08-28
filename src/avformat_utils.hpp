@@ -1,9 +1,18 @@
 #pragma once
 
+#include <iostream>
+#include <memory>
 #include <optional>
+
+extern "C"
+{
+#include <libavformat/avformat.h>
+#include <libavutil/dict.h>
+}
 
 namespace hw::stb
 {
+
 
 class Libavformat_network
 {
@@ -27,5 +36,25 @@ class Libavformat_network
 
     explicit Libavformat_network(bool active);
 };
+
+struct AVFormatContext_closer
+{
+    auto operator()(AVFormatContext* ptr) { avformat_close_input(&ptr); }
+};
+
+auto open_avformat(std::string const& url)
+    -> std::unique_ptr<AVFormatContext, AVFormatContext_closer>;
+
+void print_stream(AVStream const* const stream, std::ostream& out);
+
+auto rtsp_stream_connect(std::string const& rtsp_url)
+    -> std::unique_ptr<AVFormatContext, AVFormatContext_closer>;
+
+
+/*!
+ * \brief Prints info about the streams in format_context to the specified out
+ * channel
+ */
+void print_streams(AVFormatContext* format_context, std::ostream& out);
 
 } //namespace hw::stb
