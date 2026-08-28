@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <format>
 #include <iostream>
 #include <memory>
@@ -20,6 +21,7 @@ extern "C"
 
 namespace hw::stb
 {
+
 
 namespace
 {
@@ -91,7 +93,7 @@ auto open_avformat(std::string const& url)
 
 void print_stream(AVStream const* const stream, std::ostream& out)
 {
-    auto get_media_type = [](AVMediaType type) -> char const* {
+    auto const get_media_type = [](AVMediaType type) -> char const* {
         auto const* const media_type = av_get_media_type_string(type);
         return media_type != nullptr ? media_type : "unknown";
     };
@@ -104,8 +106,24 @@ void print_stream(AVStream const* const stream, std::ostream& out)
                        stream->codecpar->height);
 }
 
-auto rtsp_stream_connect(std::string const& rtsp_url)
-    -> std::unique_ptr<AVFormatContext, AVFormatContext_closer>
+//Uses std::string const& rather than string_view as we interface with C string
+//APIs
+auto rtsp_stream_connect(std::string const& rtsp_url,
+                         Credentials const& credentials) -> AVFormatContext_ptr
+{
+    assert(rtsp_url.starts_with("rtsp://") || rtsp_url.starts_with("rtsps://"));
+
+    std::size_t const scheme_end{rtsp_url.find("://") + 3};
+    auto scheme = rtsp_url.substr(0, scheme_end);
+    auto rest   = rtsp_url.substr(scheme_end);
+
+    auto const url = std::format("{}{}:{}@{}", scheme, credentials.username,
+                                 credentials.password, rest);
+
+    return open_avformat(url);
+}
+
+auto rtsp_stream_connect(std::string const& rtsp_url) -> AVFormatContext_ptr
 {
     assert(rtsp_url.starts_with("rtsp://") || rtsp_url.starts_with("rtsps://"));
 
