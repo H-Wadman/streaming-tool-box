@@ -60,7 +60,6 @@ function(streaming_toolbox_apply_project_options target)
   endif()
 
   target_compile_features("${target}" PUBLIC cxx_std_20)
-  set_property(TARGET "${target}" PROPERTY CXX_EXTENSIONS OFF)
 
   if(STREAMINGTOOLBOX_ENABLE_WARNINGS)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")

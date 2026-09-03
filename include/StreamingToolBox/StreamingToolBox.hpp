@@ -2,9 +2,9 @@
 
 #include <StreamingToolBox/Export.hpp>
 
-namespace streaming_toolbox
+namespace hw::stb
 {
 
-STREAMINGTOOLBOX_EXPORT unsigned int ffmpeg_avformat_version() noexcept;
+STREAMINGTOOLBOX_EXPORT auto ffmpeg_avformat_version() noexcept -> unsigned int;
 
-} //namespace streaming_toolbox
+} //namespace hw::stb

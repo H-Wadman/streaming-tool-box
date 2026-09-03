@@ -5,9 +5,10 @@ extern "C"
 #include <libavformat/avformat.h>
 }
 
-namespace streaming_toolbox
+namespace hw::stb
 {
 
-unsigned int ffmpeg_avformat_version() noexcept { return avformat_version(); }
+auto ffmpeg_avformat_version() noexcept -> unsigned int
+{ return avformat_version(); }
 
-} //namespace streaming_toolbox
+} //namespace hw::stb

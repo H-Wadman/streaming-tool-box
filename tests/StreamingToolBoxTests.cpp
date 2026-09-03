@@ -3,4 +3,4 @@
 #include <gtest/gtest.h>
 
 TEST(StreamingToolBox, ReportsAvformatVersion)
-{ EXPECT_GT(streaming_toolbox::ffmpeg_avformat_version(), 0U); }
+{ EXPECT_GT(hw::stb::ffmpeg_avformat_version(), 0U); }
